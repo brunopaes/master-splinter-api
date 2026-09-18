@@ -1,0 +1,8 @@
+# api/ is the build context; none of this needs to be in the image.
+Dockerfile
+.dockerignore
+deploy/
+README.md
+__pycache__/
+*.pyc
+.pytest_cache/
