@@ -1,5 +1,8 @@
-# api/ is its own build context - build from here, not the repo root:
-#   docker build -t master-splinter-api api/
+# This directory is its own build context - build from here, whether that's
+# `api/` inside the master-splinter monorepo or the root of a standalone
+# checkout like master-splinter-api:
+#   docker build -t master-splinter-api .   (run from inside this directory)
+#   docker build -t master-splinter-api api/   (run from the monorepo root)
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
