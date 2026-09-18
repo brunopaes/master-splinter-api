@@ -1,0 +1,70 @@
+# Cloud Build pipeline for api/: build the image, push it to Artifact
+# Registry, then roll it out to Cloud Run via deploy/service.yaml.
+#
+# api/ is the source root this gets submitted with, so every path below
+# (Dockerfile, deploy/service.yaml) is relative to api/, not the repo root.
+# Run by hand until this is wired to a trigger, from the repo root:
+#   gcloud builds submit --config=api/deploy/cloudbuild.yaml \
+#     --substitutions=_REGION=us-central1 api/
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: master-splinter
+  _SERVICE: master-splinter-api
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/api:${SHORT_SHA}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/api:latest
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/api
+
+  # service.yaml is checked in with PROJECT_ID/REGION placeholders rather
+  # than this substitution's values baked in, so it stays copy-pasteable for
+  # `gcloud run services replace` against any project. Render a throwaway
+  # copy for this build only.
+  - id: render-manifest
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        sed \
+          -e "s|PROJECT_ID|${PROJECT_ID}|g" \
+          -e "s|REGION|${_REGION}|g" \
+          -e "s|:latest|:${SHORT_SHA}|" \
+          deploy/service.yaml > /workspace/service.rendered.yaml
+
+  - id: deploy
+    name: gcr.io/cloud-builders/gcloud
+    args:
+      - run
+      - services
+      - replace
+      - /workspace/service.rendered.yaml
+      - --region=${_REGION}
+
+  - id: allow-public-traffic
+    name: gcr.io/cloud-builders/gcloud
+    args:
+      - run
+      - services
+      - add-iam-policy-binding
+      - ${_SERVICE}
+      - --region=${_REGION}
+      - --member=allUsers
+      - --role=roles/run.invoker
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/api:${SHORT_SHA}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/api:latest

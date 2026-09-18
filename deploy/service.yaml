@@ -1,0 +1,34 @@
+# Cloud Run's declarative service manifest (Knative format). Apply with:
+#   gcloud run services replace api/deploy/service.yaml --region=REGION
+#
+# Placeholders (PROJECT_ID, REGION) are filled in by cloudbuild.yaml's
+# `sed` step rather than by hand - see the "Render the service manifest"
+# step there. Edit this file for anything that isn't project-specific
+# (scaling, resources, env vars); edit cloudbuild.yaml's substitutions for
+# anything that is.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: master-splinter-api
+spec:
+  template:
+    metadata:
+      annotations:
+        # Scale to zero: this serves one website's occasional dive-analysis
+        # requests, not steady traffic. Nothing here needs to stay warm, and
+        # a cold start (a few hundred ms for a dependency-light FastAPI app)
+        # is cheaper than paying for an idle instance.
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "3"
+    spec:
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT_ID/master-splinter/api:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+  traffic:
+    - percent: 100
+      latestRevision: true

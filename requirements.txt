@@ -1,0 +1,8 @@
+# The container's runtime deps - api/ is the Docker/Cloud Build root, so it
+# consumes master-splinter the way any other external caller would: from
+# PyPI, not by reaching up into ../src. (Local dev still uses
+# `pip install -e ".[api]"` from the repo root, against the editable source
+# tree - this file is for the deployable image only.)
+master-splinter>=0.1.0,<1
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
