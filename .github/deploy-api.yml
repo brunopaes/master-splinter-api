@@ -1,0 +1,51 @@
+name: Deploy API
+
+# Manual for now - there is no GCP project wired up yet, so there is nothing
+# for a push trigger to deploy to. Flip this to a tag push (like release.yml)
+# or a push to main once api/ actually has somewhere to land, and fill in the
+# repository variables/secrets referenced below.
+on:
+  workflow_dispatch:
+
+concurrency:
+  # Two deploys racing would `gcloud run services replace` each other's
+  # image; only the most recently requested one should ever be in flight.
+  group: deploy-api
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # Workload Identity Federation - no long-lived key in secrets
+
+jobs:
+  deploy:
+    name: build and deploy to Cloud Run
+    runs-on: ubuntu-latest
+    # A protected environment gates this the same way release.yml's `pypi`
+    # environment gates a publish: a manual trigger fired by mistake still
+    # needs a human to approve it before anything reaches the project.
+    environment:
+      name: gcp-production
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          # Set these two as repository (or environment) variables once the
+          # GCP project exists: GCP_WORKLOAD_IDENTITY_PROVIDER is the full
+          # provider resource name from `gcloud iam workload-identity-pools
+          # providers describe`, GCP_DEPLOY_SERVICE_ACCOUNT is the service
+          # account it's allowed to impersonate.
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and deploy via Cloud Build
+        run: |
+          gcloud builds submit \
+            --project="${{ vars.GCP_PROJECT_ID }}" \
+            --config=api/deploy/cloudbuild.yaml \
+            --substitutions=_REGION="${{ vars.GCP_REGION }}" \
+            api/
