@@ -1,4 +1,4 @@
-# `master-splinter` API
+# `master-splinter` `API`
 
 A small FastAPI service wrapping the two `master_splinter` analysers over
 HTTP, for consumers (like `master-splinter-web`) that want a backend instead
@@ -16,7 +16,7 @@ so the library keeps its zero-runtime-dependency guarantee.
 
 ## Contents
 
-- [`master-splinter` API](#master-splinter-api)
+- [`master-splinter` `API`](#master-splinter-api)
   - [Contents](#contents)
   - [Install](#install)
   - [Run](#run)
@@ -31,13 +31,12 @@ so the library keeps its zero-runtime-dependency guarantee.
     - [Field reference](#field-reference-1)
     - [Response fields](#response-fields-1)
   - [Errors](#errors)
-  - [Tests](#tests)
-  - [CORS](#cors)
+
 
 ## Install
 
 ```bash
-pip install -e ".[api]"
+pip install -e .
 ```
 
 ## Run
@@ -57,6 +56,8 @@ ceiling so what comes out is a dive someone could actually perform, and
 reports the stops that clamping forced.
 
 ### Quick start
+
+<details><summary><code>curl</code> request and JSON response</summary></br>
 
 ```bash
 curl -X POST localhost:8000/profile-analysis \
@@ -92,14 +93,34 @@ curl -X POST localhost:8000/profile-analysis \
     {"depth": 3.0, "duration": 3.17, "started_at": 32.5}
   ],
   "findings": [
-    {"kind": "ceiling_violation", "label": "Ceiling", "time": 27.17, "depth": 4.94,
-     "detail": "plan calls for 4.9 m but the ceiling is 6.0 m (1.1 m above it)"},
-    {"kind": "ceiling_violation", "label": "Ceiling", "time": 33.0, "depth": 0.0,
-     "detail": "plan calls for 0.0 m but the ceiling is 3.0 m (3.0 m above it)"},
-    {"kind": "surfaced_with_obligation", "label": "Surfaced owing", "time": 33.0, "depth": 0.0,
-     "detail": "plan surfaces owing 2.5 min, first stop at 3.0 m"},
-    {"kind": "ascent_rate_exceeded", "label": "Ascent rate", "time": 19.0, "depth": 28.01,
-     "detail": "ascending at 10.4 m/min, above the 10.0 m/min limit"}
+    {
+      "kind": "ceiling_violation",
+      "label": "Ceiling",
+      "time": 27.17,
+      "depth": 4.94,
+      "detail": "plan calls for 4.9 m but the ceiling is 6.0 m (1.1 m above it)"
+    },
+    {
+      "kind": "ceiling_violation",
+      "label": "Ceiling",
+      "time": 33.0,
+      "depth": 0.0,
+      "detail": "plan calls for 0.0 m but the ceiling is 3.0 m (3.0 m above it)"
+    },
+    {
+      "kind": "surfaced_with_obligation",
+      "label": "Surfaced owing",
+      "time": 33.0,
+      "depth": 0.0,
+      "detail": "plan surfaces owing 2.5 min, first stop at 3.0 m"
+    },
+    {
+      "kind": "ascent_rate_exceeded",
+      "label": "Ascent rate",
+      "time": 19.0,
+      "depth": 28.01,
+      "detail": "ascending at 10.4 m/min, above the 10.0 m/min limit"
+    }
   ],
   "track": ["... one row per simulated tick, see below ..."],
   "final_tissues": [1.425, 1.721, 1.872, "... 16 total ..."]
@@ -111,7 +132,11 @@ curl -X POST localhost:8000/profile-analysis \
 > the CLI defaults to `--seed 0` and this endpoint defaults to `seed=1` — see
 > [`seed`](#seed) below.
 
+</details>
+
 ### Request fields
+
+<details><summary>Fields and defaults</summary></br>
 
 | Field               | Default   | Description                                             |
 | ------------------- | --------- | -------------------------------------------------------- |
@@ -122,6 +147,8 @@ curl -X POST localhost:8000/profile-analysis \
 | `ascent_rate`        | `10.0`    | Maximum ascent rate (m/min), also the final surfacing rate |
 | `surface_pressure`   | `1.01325` | Ambient pressure at the surface (bar)                     |
 | `seed`               | `1`       | Seed for the boundaries' random depth jitter              |
+
+</details>
 
 ### Field reference
 
@@ -145,10 +172,22 @@ magnitude, not a signed range — the library jitters each tick by
 `uniform(-variation, +variation)`.
 
 At least one segment is required, and every segment is validated
-independently; the error names the offending segment by its 1-based position:
+independently; the error names the offending segment by its 1-based position.
+For example, this request has an invalid `phase`:
+
+```bash
+curl -X POST localhost:8000/profile-analysis \
+  -H 'content-type: application/json' \
+  -d '{"boundaries": [{"depth": 10, "duration": 5, "phase": "hover"}]}'
+```
 
 ```json
-{"detail": "segment 2: phase must be one of descend, constant, ascend, got 'hover'"}
+{"detail": "segment 1: phase must be one of descend, constant, ascend, got 'hover'"}
+```
+
+Other invalid-segment responses look like:
+
+```json
 {"detail": "segment 1: duration must be positive, got 0.0"}
 {"detail": "segment 3: variation cannot be negative, got -0.5"}
 {"detail": "the profile needs at least one segment"}
@@ -172,6 +211,12 @@ There is no `n2_fraction` override on this endpoint (unlike the CLI's
 `--n2-fraction`) — pass one of the three presets. An unknown value comes back
 as:
 
+```bash
+curl -X POST localhost:8000/profile-analysis \
+  -H 'content-type: application/json' \
+  -d '{"boundaries": [{"depth": 10, "duration": 5, "phase": "constant"}], "gas": "trimix"}'
+```
+
 ```json
 {"detail": "unknown gas 'trimix', expected one of air, ean32, ean40"}
 ```
@@ -185,6 +230,12 @@ Presets live in `GAS_MIXES` in `src/master_splinter/configs/limits.py`.
 The oxygen partial pressure the plan is judged against, in bar. Exceeding it
 produces an `Oxygen (MOD)` finding and moves the reported `MOD` accordingly.
 Validation requires `0 < ppo2_limit <= 1.6`:
+
+```bash
+curl -X POST localhost:8000/profile-analysis \
+  -H 'content-type: application/json' \
+  -d '{"boundaries": [{"depth": 10, "duration": 5, "phase": "constant"}], "ppo2_limit": 2.0}'
+```
 
 ```json
 {"detail": "need 0 < limit <= 1.6, got 2.0"}
@@ -205,9 +256,18 @@ disables the conservatism entirely and gives pure Bühlmann.
 
 Validation requires `0 < LOW <= HIGH <= 100`:
 
+```bash
+curl -X POST localhost:8000/profile-analysis \
+  -H 'content-type: application/json' \
+  -d '{"boundaries": [{"depth": 10, "duration": 5, "phase": "constant"}], "gradient_factors": "85/30"}'
+```
+
+```json
+{"detail": "need 0 < low <= high <= 100, got 85/30"}
+```
+
 ```json
 {"detail": "expected LOW/HIGH such as 30/85, got 'abc'"}
-{"detail": "need 0 < low <= high <= 100, got 85/30"}
 ```
 
 </details>
@@ -235,6 +295,8 @@ and stops — `random.seed(seed)` runs immediately before generation, matching
 
 ### Response fields
 
+<details><summary>Fields</summary></br>
+
 | Field           | Description                                                                 |
 | --------------- | ---------------------------------------------------------------------------- |
 | `seed`          | The seed actually used (echoes the request)                                  |
@@ -261,6 +323,8 @@ and every **30 s** during any decompression obligation or the final ascent to
 the surface (`generate_dive_profile`'s `interval` and `DECO_STEP`
 respectively — neither is configurable through this API).
 
+</details>
+
 ## Endpoint B — Altitude Analysis
 
 `POST /altitude-analysis` wraps `analyse_altitude_change`: decides whether a
@@ -268,6 +332,8 @@ given elevation change is safe on a given tissue state, the same question
 `cli/altitude_analyser.py` answers from a state file.
 
 ### Quick start
+
+<details><summary><code>curl</code> request and JSON response</summary></br>
 
 Using the `final_tissues` from the profile analysis above, and checking a
 `2,400 m` cabin-altitude flight straight after surfacing:
@@ -292,14 +358,26 @@ curl -X POST localhost:8000/altitude-analysis \
   "target_pressure": 0.7563,
   "safe": false,
   "raw": {
-    "label": "raw Bühlmann", "gf": 1.0, "safe": false,
-    "tolerated_pressure": 0.8934, "limiting_compartment": 5, "limiting_half_time": 27.0,
-    "margin": -0.1371, "wait_minutes": 12.0, "max_gain": 1049.6
+    "label": "raw Bühlmann",
+    "gf": 1.0,
+    "safe": false,
+    "tolerated_pressure": 0.8934,
+    "limiting_compartment": 5,
+    "limiting_half_time": 27.0,
+    "margin": -0.1371,
+    "wait_minutes": 12.0,
+    "max_gain": 1049.6
   },
   "gradient": {
-    "label": "GF 85", "gf": 0.85, "safe": false,
-    "tolerated_pressure": 0.997, "limiting_compartment": 5, "limiting_half_time": 27.0,
-    "margin": -0.2407, "wait_minutes": 23.3, "max_gain": 136.6
+    "label": "GF 85",
+    "gf": 0.85,
+    "safe": false,
+    "tolerated_pressure": 0.997,
+    "limiting_compartment": 5,
+    "limiting_half_time": 27.0,
+    "margin": -0.2407,
+    "wait_minutes": 23.3,
+    "max_gain": 136.6
   }
 }
 ```
@@ -308,7 +386,11 @@ Flying immediately after a `40 m` dive isn't safe under either conservatism
 setting — waiting the reported `wait_minutes`, or flying commercial after the
 usual 12–18 h, would be.
 
+</details>
+
 ### Request fields
+
+<details><summary>Fields and defaults</summary></br>
 
 | Field               | Default   | Description                                                   |
 | -------------------- | --------- | -------------------------------------------------------------- |
@@ -317,6 +399,8 @@ usual 12–18 h, would be.
 | `surface_interval`   | `0.0`     | Minutes already spent at the surface before the change          |
 | `gf_high`            | `0.85`    | Gradient factor applied at the surface                          |
 | `surface_pressure`   | `1.01325` | Ambient pressure at the dive site (bar)                          |
+
+</details>
 
 ### Field reference
 
@@ -328,8 +412,23 @@ pre-aged — this endpoint applies `surface_interval` itself via `age_tissues`,
 so do not off-gas them before sending. A wrong count is rejected before any
 analysis runs:
 
+```bash
+curl -X POST localhost:8000/altitude-analysis \
+  -H 'content-type: application/json' \
+  -d '{"tissues": [0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79], "elevation_gain": 500}'
+```
+
 ```json
-{"detail": [{"type": "too_short", "loc": ["body", "tissues"], "msg": "List should have at least 16 items after validation, not 15", ...}]}
+{
+  "detail": [
+    {
+      "type": "too_short",
+      "loc": ["body", "tissues"],
+      "msg": "List should have at least 16 items after validation, not 15",
+      ...
+    }
+  ]
+}
 ```
 
 </details>
@@ -344,7 +443,46 @@ coast does.
 
 Negative values are allowed and meaningful: descending raises ambient
 pressure and is always safe, so the answer is always `safe: true` with
-`wait_minutes: 0.0`.
+`wait_minutes: 0.0`:
+
+```bash
+curl -X POST localhost:8000/altitude-analysis \
+  -H 'content-type: application/json' \
+  -d '{"tissues": [0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79,0.79], "elevation_gain": -500}'
+```
+
+```json
+{
+  "elevation_gain": -500.0,
+  "surface_interval": 0.0,
+  "start_elevation": 0.0,
+  "start_pressure": 1.01325,
+  "target_pressure": 1.0723,
+  "safe": true,
+  "raw": {
+    "label": "raw Bühlmann",
+    "gf": 1.0,
+    "safe": true,
+    "tolerated_pressure": 0.79,
+    "limiting_compartment": 16,
+    "limiting_half_time": 635.0,
+    "margin": 0.2823,
+    "wait_minutes": 0.0,
+    "max_gain": -500.0
+  },
+  "gradient": {
+    "label": "GF 85",
+    "gf": 0.85,
+    "safe": true,
+    "tolerated_pressure": 0.9615,
+    "limiting_compartment": 16,
+    "limiting_half_time": 635.0,
+    "margin": 0.1108,
+    "wait_minutes": 0.0,
+    "max_gain": -500.0
+  }
+}
+```
 
 </details>
 
@@ -377,6 +515,8 @@ elevation to a pressure with `pressure_at_elevation(m)` from
 
 ### Response fields
 
+<details><summary>Fields</summary></br>
+
 | Field              | Description                                                       |
 | ------------------ | ------------------------------------------------------------------ |
 | `elevation_gain`    | Echoes the request                                                  |
@@ -406,6 +546,8 @@ Each verdict (`raw`, `gradient`) carries:
 > gains are unreachable however long the diver waits (raw Bühlmann tops out
 > around `5,600 m` of tolerated elevation at full surface equilibrium).
 
+</details>
+
 ## Errors
 
 Bad input — an unknown gas, malformed gradient factors, a segment with a
@@ -417,43 +559,45 @@ Pydantic's own type/shape checks (missing required fields, wrong types, a
 `tissues` list of the wrong length) return FastAPI's standard validation
 error shape instead.
 
-## Tests
+<details><summary>Example — domain error (unknown gas)</summary></br>
 
 ```bash
-pip install -e ".[api,test]"
-pytest tests/api
+curl -i -X POST localhost:8000/profile-analysis \
+  -H 'content-type: application/json' \
+  -d '{"boundaries": [{"depth": 10, "duration": 5, "phase": "constant"}], "gas": "trimix"}'
 ```
 
-## Deploy
+```
+HTTP/1.1 422 Unprocessable Entity
+content-type: application/json
 
-Targets Cloud Run. `api/` is its own build context — unlike local
-development, the image installs `master-splinter` from PyPI
-([`requirements.txt`](requirements.txt)) rather than the repo's `src/`, so it
-builds and deploys with no dependency on anything outside this directory:
+{"detail": "unknown gas 'trimix', expected one of air, ean32, ean40"}
+```
+
+</details>
+
+<details><summary>Example — malformed request body (missing required field)</summary></br>
 
 ```bash
-docker build -t master-splinter-api api/
-docker run -p 8080:8080 master-splinter-api
+curl -i -X POST localhost:8000/profile-analysis \
+  -H 'content-type: application/json' \
+  -d '{}'
 ```
 
-- [`api/Dockerfile`](Dockerfile) — the image.
-- [`api/requirements.txt`](requirements.txt) — pinned to a published
-  `master-splinter` release; bump it after cutting one.
-- [`api/deploy/service.yaml`](deploy/service.yaml) — the Cloud Run service
-  manifest (`gcloud run services replace`). `PROJECT_ID`/`REGION` are
-  literal placeholders, rendered at build time.
-- [`api/deploy/cloudbuild.yaml`](deploy/cloudbuild.yaml) — builds, pushes to
-  Artifact Registry, and deploys the manifest above. Run by hand for now,
-  from the repo root:
-  `gcloud builds submit --config=api/deploy/cloudbuild.yaml --substitutions=_REGION=us-central1 api/`
-- [`.github/workflows/deploy-api.yml`](../.github/workflows/deploy-api.yml)
-  — `workflow_dispatch`-only until a GCP project exists to point it at; see
-  the workflow's comments for the repository variables it needs
-  (`GCP_PROJECT_ID`, `GCP_REGION`, `GCP_WORKLOAD_IDENTITY_PROVIDER`,
-  `GCP_DEPLOY_SERVICE_ACCOUNT`).
+```
+HTTP/1.1 422 Unprocessable Entity
+content-type: application/json
 
-## CORS
+{
+  "detail": [
+    {
+      "type": "missing",
+      "loc": ["body", "boundaries"],
+      "msg": "Field required",
+      "input": {}
+    }
+  ]
+}
+```
 
-`main.py` currently allows all origins so the website can call it during
-development. Restrict `allow_origins` to the deployed site before running
-this anywhere public.
+</details>
