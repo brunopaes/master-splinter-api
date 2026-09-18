@@ -1,0 +1,45 @@
+# API Gateway's OpenAPI spec. Deliberately separate from FastAPI's own
+# /openapi.json - API Gateway only accepts OpenAPI 2.0 (Swagger), and FastAPI
+# generates 3.0, so this is hand-maintained rather than exported.
+#
+# CLOUD_RUN_URL is a literal placeholder, filled in at create-config time -
+# see the `sed` step in the deploy instructions - so this stays
+# copy-pasteable rather than tied to one project's Cloud Run hostname.
+swagger: "2.0"
+info:
+  title: master-splinter-api
+  description: Gateway in front of the master-splinter Cloud Run service.
+  version: 1.0.0
+schemes:
+  - https
+produces:
+  - application/json
+x-google-backend:
+  address: CLOUD_RUN_URL
+  protocol: h2
+securityDefinitions:
+  api_key:
+    type: apiKey
+    name: key
+    in: query
+security:
+  - api_key: []
+paths:
+  /profile-analysis:
+    post:
+      summary: Run a profile analysis
+      operationId: profileAnalysis
+      responses:
+        "200":
+          description: Analysis result
+        "422":
+          description: Invalid request
+  /altitude-analysis:
+    post:
+      summary: Run an altitude analysis
+      operationId: altitudeAnalysis
+      responses:
+        "200":
+          description: Analysis result
+        "422":
+          description: Invalid request
