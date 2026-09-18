@@ -10,14 +10,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copied into an `api/` subdirectory, not flattened into /app, so the
-# package's own internal imports (`from api.processors import ...`) resolve
-# unchanged - the container recreates the same layout `pythonpath = ["."]`
-# gives it in the repo.
-COPY . api/
+# pyproject.toml declares master-splinter/fastapi/uvicorn as regular runtime
+# dependencies, so `pip install .` pulls the published master-splinter from
+# PyPI - the same as any other external caller - rather than reaching up
+# into ../src. Copied and installed before the rest of the source so this
+# layer only rebuilds when dependencies change, not on every code edit.
+COPY pyproject.toml .
+COPY src/ src/
+RUN pip install --no-cache-dir .
 
 # Cloud Run assigns the port at deploy time via $PORT; 8080 is just the
 # default a `docker run -p 8080:8080` without --env PORT will land on.
