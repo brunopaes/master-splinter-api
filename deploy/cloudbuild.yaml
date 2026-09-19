@@ -68,3 +68,10 @@ steps:
 images:
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/api:${BUILD_ID}
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/api:latest
+
+options:
+  # Default legacy logging writes to the project's auto-created
+  # `<project>_cloudbuild` bucket, which Workload Identity Federation
+  # callers can't be granted working access to no matter what IAM is set -
+  # Cloud Logging sidesteps that bucket entirely.
+  logging: CLOUD_LOGGING_ONLY
