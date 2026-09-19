@@ -49,13 +49,11 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Debug auth identity
-        run: gcloud auth list --format="table(account,type)"
-
       - name: Build and deploy via Cloud Build
         run: |
           gcloud builds submit \
             --project="${{ vars.GCP_PROJECT_ID }}" \
             --config=deploy/cloudbuild.yaml \
             --substitutions=_REGION="${{ vars.GCP_REGION }}" \
+            --gcs-source-staging-dir="gs://${{ vars.GCP_PROJECT_ID }}-build-source/source" \
             .
