@@ -139,3 +139,5 @@ dmypy.json
 # cli/profile_analyser.py renders to the working directory by default,
 # so running it from the repository root drops this here.
 dive_simulation.png
+
+*.DS_Store
